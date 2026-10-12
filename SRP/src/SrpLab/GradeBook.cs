@@ -5,53 +5,35 @@ namespace SrpLab;
 /// </summary>
 public sealed class GradeBook
 {
-    private readonly Dictionary<string, List<decimal>> _scores = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ScoreLedger _ledger=new(); private readonly GradeAverageCalculator _averageCalculator=new(); private readonly LetterGradePolicy _letterPolicy=new(); private readonly HonorRollPolicy _honorPolicy=new(); private readonly TranscriptFormatter _transcriptFormatter=new(); private readonly GradeBookCsvExporter _csvExporter=new();
 
     public void Record(string studentId, decimal score)
     {
-        if (score is < 0 or > 100) throw new ArgumentOutOfRangeException(nameof(score));
-        if (!_scores.TryGetValue(studentId, out var list))
-        {
-            list = new List<decimal>();
-            _scores[studentId] = list;
-        }
-        list.Add(score);
+        _ledger.Record(studentId,score);
     }
 
     public decimal Average(string studentId)
     {
-        if (!_scores.TryGetValue(studentId, out var list) || list.Count == 0) return 0m;
-        return Math.Round(list.Average(), 2);
+        return _averageCalculator.Calculate(_ledger.Get(studentId));
     }
 
     public string Letter(string studentId)
     {
-        // Academic policy bands change with faculty senate — not with CSV layout.
-        var avg = Average(studentId);
-        if (avg >= 90) return "A";
-        if (avg >= 80) return "B";
-        if (avg >= 70) return "C";
-        if (avg >= 60) return "D";
-        return "F";
+        return _letterPolicy.Get(Average(studentId));
     }
 
     public bool MeetsHonorRoll(string studentId)
     {
-        // Extra academic rule set embedded beside averaging.
-        return Average(studentId) >= 85 && Letter(studentId) is "A" or "B";
+        return _honorPolicy.Meets(Average(studentId),Letter(studentId));
     }
 
     public string TranscriptPlain(string studentId, string fullName)
     {
-        // Registrar document format ≠ grading policy.
-        return $"TRANSCRIPT\nStudent: {fullName} ({studentId})\nAverage: {Average(studentId)}\nLetter: {Letter(studentId)}\nHonor: {MeetsHonorRoll(studentId)}\n";
+        return _transcriptFormatter.Format(studentId,fullName,Average(studentId),Letter(studentId),MeetsHonorRoll(studentId));
     }
 
     public string ExportCsv()
     {
-        var rows = new List<string> { "studentId,average,letter,honor" };
-        foreach (var id in _scores.Keys.OrderBy(x => x))
-            rows.Add($"{id},{Average(id)},{Letter(id)},{(MeetsHonorRoll(id) ? 1 : 0)}");
-        return string.Join('\n', rows);
+        return _csvExporter.Export(_ledger.StudentIds(),Average,Letter,MeetsHonorRoll);
     }
 }

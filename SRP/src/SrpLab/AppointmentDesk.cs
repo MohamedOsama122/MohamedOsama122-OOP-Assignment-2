@@ -5,7 +5,7 @@ namespace SrpLab;
 /// </summary>
 public sealed class AppointmentDesk
 {
-    private readonly HashSet<DateTimeOffset> _booked = new();
+    private readonly ClinicBusinessHoursPolicy _hoursPolicy=new(); private readonly AppointmentBookingCalendar _calendar=new(); private readonly AppointmentSlotFinder _slotFinder=new(); private readonly IcsCalendarSerializer _icsSerializer=new(); private readonly SmsReminderComposer _smsComposer=new();
     public TimeOnly Open { get; }
     public TimeOnly Close { get; }
     public int SlotMinutes { get; }
@@ -19,51 +19,26 @@ public sealed class AppointmentDesk
 
     public bool IsWithinBusinessHours(DateTimeOffset when)
     {
-        // Clinic calendar policy — HR/ops — not the same as ICS serialization.
-        if (when.DayOfWeek is DayOfWeek.Friday or DayOfWeek.Saturday) return false;
-        var t = TimeOnly.FromDateTime(when.DateTime);
-        return t >= Open && t.AddMinutes(SlotMinutes) <= Close;
+        return _hoursPolicy.IsWithin(when,Open,Close,SlotMinutes);
     }
 
     public DateTimeOffset? FindNextSlot(DateTimeOffset from, int searchHours)
     {
-        var cursor = Align(from);
-        var end = from.AddHours(searchHours);
-        while (cursor < end)
-        {
-            if (IsWithinBusinessHours(cursor) && !_booked.Contains(cursor))
-                return cursor;
-            cursor = cursor.AddMinutes(SlotMinutes);
-        }
-        return null;
+        return _slotFinder.Find(from,searchHours,SlotMinutes,_hoursPolicy,Open,Close,_calendar);
     }
 
     public bool TryBook(DateTimeOffset slot)
     {
-        if (!IsWithinBusinessHours(slot) || _booked.Contains(slot)) return false;
-        _booked.Add(slot);
-        return true;
+        if (!IsWithinBusinessHours(slot)) return false; return _calendar.Book(slot);
     }
 
     public string ToIcs(DateTimeOffset slot, string patientName, string clinician)
     {
-        // Calendar interoperability format changes with clients — not opening hours.
-        var uid = Guid.NewGuid();
-        var end = slot.AddMinutes(SlotMinutes);
-        return "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n" +
-               $"UID:{uid}\nDTSTART:{slot:yyyyMMdd'T'HHmmss'Z'}\nDTEND:{end:yyyyMMdd'T'HHmmss'Z'}\n" +
-               $"SUMMARY:Visit {patientName} / {clinician}\nEND:VEVENT\nEND:VCALENDAR\n";
+        return _icsSerializer.Serialize(slot,SlotMinutes,patientName,clinician);
     }
 
     public string SmsReminder(DateTimeOffset slot, string clinicPhone)
     {
-        // Messaging channel copy — fourth concern hiding in the "scheduler".
-        return $"Reminder: appointment {slot:MMM dd HH:mm}. Call {clinicPhone} to reschedule.";
-    }
-
-    private DateTimeOffset Align(DateTimeOffset from)
-    {
-        var minutes = from.Minute - (from.Minute % SlotMinutes);
-        return new DateTimeOffset(from.Year, from.Month, from.Day, from.Hour, minutes, 0, from.Offset);
+        return _smsComposer.Compose(slot,clinicPhone);
     }
 }
