@@ -78,5 +78,5 @@ public sealed class Loan
     public decimal LateFee { get { if (Status != LoanStatus.Returned || ReturnDate is null || ReturnDate.Value <= DueDate) return 0m; return Member.ApplyDiscount((ReturnDate.Value.DayNumber - DueDate.DayNumber) * Item.GetDailyLateFee()); } }
     internal Loan(string id, DateOnly date, Member member, LibraryItem item) { if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("Loan ID is required."); LoanId = id; BorrowDate = date; Member = member; Item = item; Status = LoanStatus.Borrowed; }
     internal void Return(DateOnly date) { if (Status != LoanStatus.Borrowed) throw new InvalidOperationException("Only a borrowed loan can be returned."); if (date < BorrowDate) throw new ArgumentException("Return date cannot be earlier than borrow date."); ReturnDate = date; Status = LoanStatus.Returned; Item.MarkAvailable(); }
-    internal void MarkLost() { if (Status != LoanStatus.Borrowed) throw new InvalidOperationException("Only a borrowed loan can be marked lost."); Status = LoanStatus.Lost; Item.MarkAvailable(); }
+    internal void MarkLost() { if (Status != LoanStatus.Borrowed) throw new InvalidOperationException("Only a borrowed loan can be marked lost."); Status = LoanStatus.Lost; Item.Withdraw(); }
 }
