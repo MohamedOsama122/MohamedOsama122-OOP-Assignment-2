@@ -1,7 +1,5 @@
 # LinkedIn Posts
 
-The following public URLs will be added after the posts are published by the student:
-
-- Singleton: pending publication
-- Prototype: pending publication
-- Builder: pending publication
+- Singleton: https://lnkd.in/p/ejGb-KfT
+- Prototype: https://lnkd.in/p/eMvguiYR
+- Builder: https://lnkd.in/p/egHmZkQQ
