@@ -8,7 +8,10 @@ public sealed class WardBoard
 {
     private readonly Dictionary<int, string> _bedPatient = new();
     private readonly Dictionary<int, int> _vitalsScore = new();
-    private readonly List<string> _pagerLog = new();
+    private readonly AcuityScorer _acuityScorer = new();
+    private readonly PagerEscalationLog _pagerLog = new();
+    private readonly HandoffNoteFormatter _handoffFormatter = new();
+    private readonly WardCensusCsvWriter _censusWriter = new();
 
     public void AssignBed(int bed, string patientId, int heartRate, int spo2)
     {
@@ -16,21 +19,13 @@ public sealed class WardBoard
         if (string.IsNullOrWhiteSpace(patientId)) throw new ArgumentException("patient required");
 
         _bedPatient[bed] = patientId.Trim().ToUpperInvariant();
-        _vitalsScore[bed] = ScoreAcuity(heartRate, spo2);
-
-        if (_vitalsScore[bed] >= 8)
-            _pagerLog.Add($"CODE-YELLOW bed={bed} at {DateTime.UtcNow:HH:mm}");
+        _vitalsScore[bed] = _acuityScorer.Score(heartRate, spo2);
+        _pagerLog.RecordIfNeeded(bed, _vitalsScore[bed]);
     }
 
     public int ScoreAcuity(int heartRate, int spo2)
     {
-        // Clinical scoring mixed with arbitrary pager thresholds (policy will churn separately).
-        var score = 0;
-        if (heartRate > 120 || heartRate < 45) score += 4;
-        else if (heartRate > 100) score += 2;
-        if (spo2 < 90) score += 5;
-        else if (spo2 < 94) score += 2;
-        return Math.Min(score, 10);
+        return _acuityScorer.Score(heartRate, spo2);
     }
 
     public string BuildHandoffNote(int bed)
@@ -38,25 +33,16 @@ public sealed class WardBoard
         if (!_bedPatient.TryGetValue(bed, out var patient))
             return $"Bed {bed}: empty";
 
-        var acuity = _vitalsScore[bed];
-        var tone = acuity >= 8 ? "ESCALATE" : acuity >= 4 ? "WATCH" : "STABLE";
-        // Presentation / narrative format will change without clinical rules changing.
-        return $"[HANDOFF {DateTime.UtcNow:yyyy-MM-dd}] Bed {bed} · {patient} · acuity={acuity} · {tone}";
+        return _handoffFormatter.Format(bed, patient, _vitalsScore[bed]);
     }
 
     public IReadOnlyList<string> DrainPagerLog()
     {
-        var copy = _pagerLog.ToList();
-        _pagerLog.Clear();
-        return copy;
+        return _pagerLog.Drain();
     }
 
     public string ExportCensusCsv()
     {
-        // Persistence/export shape mixed into the same type as acuity + paging.
-        var lines = new List<string> { "bed,patient,acuity" };
-        foreach (var bed in _bedPatient.Keys.OrderBy(x => x))
-            lines.Add($"{bed},{_bedPatient[bed]},{_vitalsScore[bed]}");
-        return string.Join('\n', lines);
+        return _censusWriter.Write(_bedPatient, _vitalsScore);
     }
 }
