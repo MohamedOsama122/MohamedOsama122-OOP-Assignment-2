@@ -1,0 +1,26 @@
+digraph LibrarySystem {
+  graph [rankdir=TB, bgcolor="white", fontname="Arial", nodesep=0.35, ranksep=0.6];
+  node [shape=record, fontname="Arial", fontsize=10, margin="0.08,0.05"];
+  edge [fontname="Arial", fontsize=9];
+
+  Person [label="{Person|# PersonId: string {get}\l# FullName: string {get}\l# Phone: string {get}\l|# Person(id, name, phone)}"];
+  Member [label="{Member|# MaxActiveLoans: int {get}\l# LateFeeDiscountPercent: decimal {get}\l- _loans: List<Loan>\l+ Loans: IReadOnlyList<Loan> {get}\l|+ BorrowItem(...) : Loan\l}"];
+  StudentMember [label="{StudentMember||+ StudentMember(...)}"];
+  PremiumMember [label="{PremiumMember|+ ReadingPoints: int {get, computed}\l|+ PremiumMember(...)}"];
+  Staff [label="{Staff|+ HireDate: DateOnly {get}\l+ MonthlySalary: decimal {get, private set}\l# ResponsibilityAllowance: decimal {get}\l|+ GiveRaise(percent)\l+ GetMonthlyPay(): decimal}"];
+  Librarian [label="{Librarian||+ ProcessReturn(loan, date)\l+ MarkItemLost(loan)}"];
+  Shelver [label="{Shelver|+ Section: string {get, private set}\l|+ Reassign(section)}"];
+  Head [label="{HeadLibrarian||+ ChangeLateFee(item, fee)\l+ WithdrawItem(item)\l+ RestoreItem(item)}"];
+  LibraryItem [label="{LibraryItem|+ CatalogNumber: string {get}\l+ Title: string {get}\l+ BaseLateFee: decimal {get, private set}\l+ IsWithdrawn: bool {get, private set}\l+ IsOnLoan: bool {get, internal set}\l# LoanPeriodDays: int {get}\l# LateFeeMultiplier: decimal {get}\l|+ ChangeBaseLateFee(fee)\l+ GetDailyLateFee(): decimal\l+ Withdraw(); Restore()}"];
+  Book [label="{Book||+ Book(...)}"];
+  Dvd [label="{Dvd||+ Dvd(...)}"];
+  Magazine [label="{Magazine||+ Magazine(...)}"];
+  Loan [label="{Loan|+ LoanId: string {get}\l+ BorrowDate: DateOnly {get}\l+ DueDate: DateOnly {get, computed}\l+ Member: Member {get}\l+ Item: LibraryItem {get}\l+ Status: LoanStatus {get, private set}\l+ ReturnDate: DateOnly? {get, private set}\l+ LateFee: decimal {get, computed}\l|internal Return(date)\linternal MarkLost()} "];
+  Status [label="{<<enumeration>>\nLoanStatus|Borrowed\lReturned\lLost\l}"];
+
+  Member -> Person [arrowhead=empty]; StudentMember -> Member [arrowhead=empty]; PremiumMember -> Member [arrowhead=empty];
+  Staff -> Person [arrowhead=empty]; Librarian -> Staff [arrowhead=empty]; Shelver -> Staff [arrowhead=empty]; Head -> Staff [arrowhead=empty];
+  Book -> LibraryItem [arrowhead=empty]; Dvd -> LibraryItem [arrowhead=empty]; Magazine -> LibraryItem [arrowhead=empty];
+  Loan -> Member [label="member 1", arrowhead=none]; Member -> Loan [label="loans 0..*", arrowhead=none];
+  Loan -> LibraryItem [label="item 1", arrowhead=none]; Loan -> Status [label="status", arrowhead=none];
+}

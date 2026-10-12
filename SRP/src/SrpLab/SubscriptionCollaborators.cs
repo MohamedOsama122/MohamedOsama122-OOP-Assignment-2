@@ -1,0 +1,5 @@
+namespace SrpLab;
+public sealed class SubscriptionProrationCalculator { public decimal Calculate(decimal price,DateOnly start,DateOnly end,DateOnly active){if(active<=start)return price;if(active>=end)return 0m;var days=end.DayNumber-start.DayNumber;if(days<=0)return price;return Math.Round(price*(end.DayNumber-active.DayNumber)/days,2);} }
+public sealed class InvoiceNumberGenerator { private static int _sequence=1000; public string Next(DateOnly start){return $"INV-{start:yyyyMM}-{++_sequence:D5}";} }
+public sealed class DunningEmailComposer { public string Compose(string name,DateOnly asOf,decimal amount,string invoice,int failures){var severity=failures<=1?"friendly reminder":failures==2?"second notice":"final notice before suspension";return $"Subject: {severity} {invoice}\nHi {name},\nBalance {amount:C} as of {asOf:o} ({failures} failures).\n";} }
+public sealed class LedgerJournalFormatter { public string Format(string customer,string invoice,decimal amount){return $"{customer},{invoice},{amount:0.00},AR-SUB";} }
